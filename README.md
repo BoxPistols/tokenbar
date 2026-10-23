@@ -42,6 +42,21 @@ Claude Code の statusLine（公式の拡張点）が渡す JSON だけを読み
 
 ## インストール
 
+### ビルド済みのアプリを使う
+
+[TokenBar-macos-x86_64.zip](https://github.com/BoxPistols/tokenbar/releases/latest/download/TokenBar-macos-x86_64.zip) を落として展開し、`TokenBar.app` を `~/Applications` か `/Applications` に置きます（macOS 13 以降、Intel のみ）。Apple の公証を受けていないため、初回の起動は macOS に止められます。「システム設定」＞「プライバシーとセキュリティ」で一度だけ許可してください。
+
+`statusline.sh` も同じリリースから落とせます。
+
+```sh
+curl -L -o ~/.claude/tokenbar-statusline.sh https://github.com/BoxPistols/tokenbar/releases/latest/download/statusline.sh
+chmod +x ~/.claude/tokenbar-statusline.sh
+```
+
+このときは下の statusLine の設定で、パスを `~/.claude/tokenbar-statusline.sh` にしてください。
+
+### ソースからビルドする
+
 Xcode のコマンドラインツールが必要です。
 
 ```sh
