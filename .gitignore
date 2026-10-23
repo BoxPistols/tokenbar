@@ -1,0 +1,3 @@
+# build.sh が生成するため（swiftc の出力）
+TokenBar.app/
+.DS_Store
