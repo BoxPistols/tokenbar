@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")"
 app=TokenBar.app
 # リリースのタグ（v0.1.0 など）と揃える。新しい版の確認はこの値と比べる
-version=0.1.0
+version=0.2.0
 rm -rf "$app" && mkdir -p "$app/Contents/MacOS"
 swiftc -O -target x86_64-apple-macos13 TokenBar.swift -o "$app/Contents/MacOS/TokenBar"
 cat > "$app/Contents/Info.plist" <<PLIST
