@@ -36,7 +36,9 @@ TokenBar は個人が作った非公式のツールで、Anthropic, PBC とは�
 
 ## 値の出どころ
 
-Claude Code の statusLine（公式の拡張点）が渡す JSON だけを読みます。キーチェーンを読まず、API も呼ばず、ネットワークにも接続しません。
+Claude Code の statusLine（公式の拡張点）が渡す JSON だけを読みます。キーチェーンを読まず、使用率の API も呼びません。
+
+ネットワークに接続するのは、新しい版の確認だけです。起動時と、その後 1 日に 1 回、GitHub の最新リリース（`api.github.com`）を見ます。送るのは User-Agent（`TokenBar/版`）だけです。新しい版があれば、メニューの先頭に「TokenBar x.y.z が出ています」と出し、押すとリリースのページを開きます。
 
 `statusline.sh` が JSON を `~/Library/Application Support/TokenBar/statusline.json` に保存し、TokenBar がそれを読みます。使用率（`rate_limits`）はセッションの最初の応答の後にしか入らないので、無いときは前回の値を残します。リセット時刻を過ぎた値は 0% として扱います。
 

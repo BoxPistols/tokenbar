@@ -217,6 +217,29 @@ enum LoginItem {
     }
 }
 
+// MARK: - 新しい版の確認（1 日 1 回 GitHub の最新リリースを見る。送るのは User-Agent だけ）
+
+enum Updates {
+    static let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+    static let url = URL(string: "https://api.github.com/repos/BoxPistols/tokenbar/releases/latest")!
+    static var available: (version: String, page: URL)?
+
+    static func check(_ done: @escaping () -> Void) {
+        var req = URLRequest(url: url, timeoutInterval: 30)
+        req.setValue("TokenBar/\(current)", forHTTPHeaderField: "User-Agent")
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            // 失敗しても何も出さない。次の確認まで待つ
+            guard let obj = data.flatMap({ try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }),
+                  let tag = obj["tag_name"] as? String,
+                  let page = (obj["html_url"] as? String).flatMap(URL.init(string:)) else { return }
+            let latest = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+            // "0.10.0" > "0.9.0" になるよう数値として比べる
+            let newer = latest.compare(current, options: .numeric) == .orderedDescending
+            DispatchQueue.main.async { available = newer ? (latest, page) : nil; done() }
+        }.resume()
+    }
+}
+
 // MARK: - アプリ本体
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -226,6 +249,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let strip = Strip()
     var snapshot: Snapshot?
     var timer: Timer?
+    var updateTimer: Timer?
 
     func applicationDidFinishLaunching(_ n: Notification) {
         strip.view.menuProvider = { [unowned self] in makeMenu() }
@@ -240,6 +264,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in self?.refresh() }
+        Updates.check { [weak self] in self?.refresh() }
+        updateTimer = Timer.scheduledTimer(withTimeInterval: 24 * 60 * 60, repeats: true) { [weak self] _ in
+            Updates.check { self?.refresh() }
+        }
     }
 
     func refresh() {
@@ -290,6 +318,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func makeMenu() -> NSMenu {
         let menu = NSMenu()
+        if let u = Updates.available {
+            menu.addItem(withTitle: "TokenBar \(u.version) が出ています（いまは \(Updates.current)）", action: #selector(openUpdate), keyEquivalent: "").target = self
+            menu.addItem(.separator())
+        }
         if let s = snapshot {
             for l in s.limits {
                 let when = l.resets.map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) } ?? "-"
@@ -343,6 +375,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func toggleLogin() { LoginItem.set(!LoginItem.isEnabled); refresh() }
     @objc func resetPosition() { Prefs.stripOrigin = nil; refresh() }
     @objc func refreshNow() { refresh() }
+    @objc func openUpdate() { if let u = Updates.available { NSWorkspace.shared.open(u.page) } }
 }
 
 let app = NSApplication.shared

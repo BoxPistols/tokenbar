@@ -3,6 +3,8 @@
 set -e
 cd "$(dirname "$0")"
 app=TokenBar.app
+# リリースのタグ（v0.1.0 など）と揃える。新しい版の確認はこの値と比べる
+version=0.1.0
 rm -rf "$app" && mkdir -p "$app/Contents/MacOS"
 swiftc -O -target x86_64-apple-macos13 TokenBar.swift -o "$app/Contents/MacOS/TokenBar"
 cat > "$app/Contents/Info.plist" <<PLIST
@@ -12,6 +14,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
 <key>CFBundleExecutable</key><string>TokenBar</string>
 <key>CFBundleIdentifier</key><string>local.tokenbar</string>
 <key>CFBundleName</key><string>TokenBar</string>
+<key>CFBundleShortVersionString</key><string>$version</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>LSUIElement</key><true/>
