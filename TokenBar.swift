@@ -224,18 +224,21 @@ enum Updates {
     static let url = URL(string: "https://api.github.com/repos/BoxPistols/tokenbar/releases/latest")!
     static var available: (version: String, page: URL)?
 
-    static func check(_ done: @escaping () -> Void) {
+    /// done には確認できたかを渡す。失敗しても available は前回の結果のまま残す
+    static func check(_ done: @escaping (Bool) -> Void) {
         var req = URLRequest(url: url, timeoutInterval: 30)
         req.setValue("TokenBar/\(current)", forHTTPHeaderField: "User-Agent")
         URLSession.shared.dataTask(with: req) { data, _, _ in
-            // 失敗しても何も出さない。次の確認まで待つ
             guard let obj = data.flatMap({ try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }),
                   let tag = obj["tag_name"] as? String,
-                  let page = (obj["html_url"] as? String).flatMap(URL.init(string:)) else { return }
+                  let page = (obj["html_url"] as? String).flatMap(URL.init(string:)) else {
+                DispatchQueue.main.async { done(false) }
+                return
+            }
             let latest = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
             // "0.10.0" > "0.9.0" になるよう数値として比べる
             let newer = latest.compare(current, options: .numeric) == .orderedDescending
-            DispatchQueue.main.async { available = newer ? (latest, page) : nil; done() }
+            DispatchQueue.main.async { available = newer ? (latest, page) : nil; done(true) }
         }.resume()
     }
 }
@@ -250,6 +253,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var snapshot: Snapshot?
     var timer: Timer?
     var updateTimer: Timer?
+    // 「今すぐ更新」の結果をメニューバーに少しの間だけ出す
+    var flashText: String?
 
     func applicationDidFinishLaunching(_ n: Notification) {
         strip.view.menuProvider = { [unowned self] in makeMenu() }
@@ -264,9 +269,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in self?.refresh() }
-        Updates.check { [weak self] in self?.refresh() }
+        Updates.check { [weak self] _ in self?.refresh() }
         updateTimer = Timer.scheduledTimer(withTimeInterval: 24 * 60 * 60, repeats: true) { [weak self] _ in
-            Updates.check { self?.refresh() }
+            Updates.check { _ in self?.refresh() }
         }
     }
 
@@ -281,6 +286,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
         item.button?.image = nil
         item.button?.attributedTitle = NSAttributedString()
+        if let t = flashText {
+            item.button?.attributedTitle = NSAttributedString(string: t, attributes: [.font: font])
+            return
+        }
         switch Prefs.barStyle {
         case .icon:
             let img = NSImage(systemSymbolName: "gauge.medium", accessibilityDescription: "TokenBar")
@@ -374,7 +383,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func pickCritical(_ s: NSMenuItem) { Prefs.critical = Int(s.representedObject as! String)!; refresh() }
     @objc func toggleLogin() { LoginItem.set(!LoginItem.isEnabled); refresh() }
     @objc func resetPosition() { Prefs.stripOrigin = nil; refresh() }
-    @objc func refreshNow() { refresh() }
+    // 使用率を読み直し、新しい版も確認する。メニューは押すと閉じるので、結果はメニューバーに出す
+    @objc func refreshNow() {
+        refresh()
+        flash("更新中…", for: nil)
+        Updates.check { [weak self] ok in
+            self?.refresh()
+            let text = !ok ? "✓ 使用率を更新（新しい版は確認できず）"
+                : Updates.available.map { "✓ 使用率を更新・\($0.version) が出ています" } ?? "✓ 使用率を更新・最新版です"
+            self?.flash(text, for: 2.5)
+        }
+    }
+
+    func flash(_ text: String, for seconds: Double?) {
+        flashText = text
+        updateBar()
+        guard let seconds else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
+            guard self?.flashText == text else { return }
+            self?.flashText = nil
+            self?.updateBar()
+        }
+    }
     @objc func openUpdate() { if let u = Updates.available { NSWorkspace.shared.open(u.page) } }
 }
 
